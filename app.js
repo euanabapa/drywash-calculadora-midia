@@ -7,7 +7,7 @@ const LOJAS = [
 ["Aeroporto Congonhas","São Paulo","SP Capital","Aeroporto"],["Carrefour Casa Verde","São Paulo","SP Capital","Supermercado"],["Club Athletico Paulistano","São Paulo","SP Capital","Clube"],["GPA Brigadeiro","São Paulo","SP Capital","Supermercado"],["GPA Vila Clementino","São Paulo","SP Capital","Supermercado"],["Mais Shopping","São Paulo","SP Capital","Shopping"],["Morumbi Corporate","São Paulo","SP Capital","Corporativo"],["Porto Seguro","São Paulo","SP Capital","Corporativo"],["Praça Pamplona","São Paulo","SP Capital","Corporativo"],["Rochaverá","São Paulo","SP Capital","Corporativo"],["SP Corporate","São Paulo","SP Capital","Corporativo"],["SP Market","São Paulo","SP Capital","Shopping"],["Shopping Anália Franco","São Paulo","SP Capital","Shopping"],["Shopping Center Norte","São Paulo","SP Capital","Shopping"],["Shopping Eldorado","São Paulo","SP Capital","Shopping"],["Shopping Iguatemi São Paulo","São Paulo","SP Capital","Shopping"],["Shopping Jardim Pamplona","São Paulo","SP Capital","Shopping"],["Shopping Jardim Sul","São Paulo","SP Capital","Shopping"],["Shopping Market Place","São Paulo","SP Capital","Shopping"],["Shopping Morumbi","São Paulo","SP Capital","Shopping"],["Shopping Pátio Paulista","São Paulo","SP Capital","Shopping"],["Shopping Vila Olímpia","São Paulo","SP Capital","Shopping"],["Shopping Villa Lobos","São Paulo","SP Capital","Shopping"],["Shopping West Plaza","São Paulo","SP Capital","Shopping"],["Sociedade Harmonia de Tênis","São Paulo","SP Capital","Clube"],["Vila Leopoldina","São Paulo","SP Capital","Rua"]
 ];
 // ---------- premissas ----------
-const P = {tmin:100,tmax:170,conv:.40,dias:30,dlanc:56,lancShare:.20,volta:.15,manter:.10,digMin:.5,offRef:.10,offPiso:700}; // Reforçado: mídia off obrigatória = 10% da verba digital ou R$ 700, o que for maior
+const P = {tmin:100,tmax:170,conv:.40,dias:30,dlanc:56,lancShare:.20,volta:.15,manter:.10,digMin:.5,offRef:.10,offPiso:700,minCanal:300}; // minCanal: verba mínima por canal digital (R$/mês) // Reforçado: mídia off obrigatória = 10% da verba digital ou R$ 700, o que for maior
 P.tmed=(P.tmin+P.tmax)/2;
 // Catálogo digital: custo médio por contato (CPL) em R$. Valores de referência da Layer Up, a calibrar no piloto.
 const DIG = {
@@ -78,13 +78,18 @@ function pesos(pacote,cenK,selecao){
   const ww={}; on.forEach(i=>ww[i]=w[i]>0?w[i]:.10); const t=Object.values(ww).reduce((a,b)=>a+b,0)||1;
   Object.keys(ww).forEach(i=>ww[i]/=t); return ww;
 }
+// Remove canais que ficariam abaixo do mínimo e redistribui pelos % restantes (sempre fica ao menos 1).
+function aplicaMinimo(ww,D){let w={...ww};
+  while(Object.keys(w).length>1){const fora=Object.entries(w).filter(([i,f])=>D*f<P.minCanal).sort((a,b)=>a[1]-b[1]);
+    if(!fora.length)break; delete w[fora[0][0]]; const t=Object.values(w).reduce((a,b)=>a+b,0); Object.keys(w).forEach(i=>w[i]/=t);}
+  return w;}
 function cplMix(ww){return Object.entries(ww).reduce((s,[i,f])=>s+f*DIG[i].cpl,0);}
 let PLAN=null;
 function calc(){
   const {l,pubDef}=lojaInfo(); const tipo=l[3];
   $("lojaTags").innerHTML=[l[2],tipo].map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   const cap=Math.max(0,+$("cap").value||0), atual=Math.max(0,+$("atual").value||0), desej=Math.max(0,+$("desej").value||0);
-  const vagas=desej>atual; const row=vagas?"vagas":"cheia";
+  const nova=S.nova==="sim"; const vagas=nova||desej>atual; const row=vagas?"vagas":"cheia"; // loja nova: sempre na linha de clientes novos
   const pub=S.publico||pubDef;
   const pacote=Object.keys(PK).find(k=>PK[k].col===pub&&PK[k].row===row);
   const gap=Math.max(0,desej-atual), folga=Math.max(0,cap-atual);
@@ -93,9 +98,10 @@ function calc(){
     let dia, cli;
     if(vagas){dia=Math.min(gap*c.f,folga); cli=Math.round(dia*P.dias);}
     else {cli=Math.round(atual*P.dias*(pub==="passagem"?P.volta:P.manter)*c.f); dia=cli/P.dias;}
-    const ww=pesos(pacote,k), cpl=cplMix(ww), leads=Math.round(cli/P.conv), verba=leads*cpl;
+    const leads=Math.round(cli/P.conv); let ww=pesos(pacote,k), verba=leads*cplMix(ww);
+    for(let it=0;it<6;it++){const w2=aplicaMinimo(ww,verba); if(Object.keys(w2).length===Object.keys(ww).length)break; ww=w2; verba=leads*cplMix(ww);}
     const off=k==="reforcado"?Math.round(Math.max(verba*P.offRef,P.offPiso)):0, total=verba+off;
-    cens[k]={k,cli,dia,ww,verba,off,total,roi:cli*P.tmed/total,resultado:vagas?atual+dia:atual};
+    cens[k]={k,cli,dia,ww,verba,off,total,roi:verba>0?cli*P.tmed/verba:0,resultado:vagas?atual+dia:atual};
   });
   const lanc = S.nova==="sim" ? (()=>{const c=Math.round(cap*P.dlanc*P.lancShare);return {cli:c,valor:Math.round(c/P.conv)*20.5};})() : null;
   PLAN={loja:l[0],cidade:l[1],praca:l[2],tipo,publico:pub,cap,atual,desej,vagas,agenda:vagas?"Com vagas":"Cheia",pacote,cens,lanc,periodo:PERIODO,periodoTxt:PERIODO_TXT,resp:$("resp").value.trim()};
@@ -107,8 +113,8 @@ function calc(){
 function renderMatriz(){
   const row=PLAN.vagas?"vagas":"cheia";
   document.querySelectorAll(".matriz.sel .ax-row").forEach(r=>r.classList.toggle("hide",r.dataset.row!==row));
-  $("rowHint").innerHTML=`<span class="mini" aria-hidden="true"><i class="${PLAN.vagas?"on":""}"></i><i class="${PLAN.vagas?"on":""}"></i><i class="${PLAN.vagas?"":"on"}"></i><i class="${PLAN.vagas?"":"on"}"></i></span><span>${PLAN.vagas?`Sua agenda tem <b>vagas</b>: você atende ${PLAN.atual} e quer chegar a ${PLAN.desej} carros por dia. Seu plano fica na linha <b>Agenda com vagas</b>.`:`Sua agenda está <b>cheia</b> para a meta que você definiu. Seu plano fica na linha <b>Agenda cheia</b>.`}</span>`;
-  $("agendaTxt").innerHTML=PLAN.vagas?`Sua agenda tem vagas, então seu plano está entre estes dois. Escolha o que descreve a maioria dos seus clientes.`:`Sua agenda está cheia, então seu plano está entre estes dois. Escolha o que descreve a maioria dos seus clientes.`;
+  $("rowHint").innerHTML=`<span class="mini" aria-hidden="true"><i class="${PLAN.vagas?"on":""}"></i><i class="${PLAN.vagas?"on":""}"></i><i class="${PLAN.vagas?"":"on"}"></i><i class="${PLAN.vagas?"":"on"}"></i></span><span>${S.nova==="sim"?`Sua loja é <b>nova</b>: o plano fica na linha <b>Agenda com vagas</b>, de clientes novos, depois das 8 semanas de lançamento. Você quer chegar a ${PLAN.desej} carros por dia.`:PLAN.vagas?`Sua agenda tem <b>vagas</b>: você atende ${PLAN.atual} e quer chegar a ${PLAN.desej} carros por dia. Seu plano fica na linha <b>Agenda com vagas</b>.`:`Sua agenda está <b>cheia</b> para a meta que você definiu. Seu plano fica na linha <b>Agenda cheia</b>.`}</span>`;
+  $("agendaTxt").innerHTML=S.nova==="sim"?`Loja nova começa ganhando clientes novos. Em shopping, mercado, aeroporto ou rua, o plano é Atrair quem passa; em prédio ou clube, Conquistar a casa.`:PLAN.vagas?`Sua agenda tem vagas, então seu plano está entre estes dois. Escolha o que descreve a maioria dos seus clientes.`:`Sua agenda está cheia, então seu plano está entre estes dois. Escolha o que descreve a maioria dos seus clientes.`;
   document.querySelectorAll(".matriz.sel .mcard").forEach(b=>{
     const k=b.dataset.k, pk=PK[k], ativo=pk.row===row;
     b.classList.toggle("hide",!ativo); b.setAttribute("aria-pressed",k===PLAN.pacote?"true":"false");
@@ -141,7 +147,7 @@ function renderCens(){
       <span class="csub">${sub}</span>${bar}
       <span class="cval num">${brl(c.total)}<small>/mês</small></span>
       ${c.off?`<span class="coff">${brl(c.verba)} no digital <b>+ ${brl(c.off)} em mídia off</b> perto da loja (já incluso)</span>`:""}
-      <span class="cmeta">${c.cli} clientes novos por mês · ROI ${x1(c.roi)}</span>
+      <span class="cmeta">${c.cli} clientes novos por mês · ROI do digital ${x1(c.roi)}</span>
       <span class="cch">${Object.keys(c.ww).length} canais digitais</span>
     </button>`;}).join("");
   $("cens").querySelectorAll(".cen").forEach(b=>b.onclick=()=>{S.cen=b.dataset.k;S.dig=null;calc();});
@@ -160,7 +166,7 @@ function offRaio(){const u=OFFDB.map[PLAN.loja];return (u!=null&&OFFDB.u[u])?OFF
 function renderPersonal(){
   const p=PLAN, c=p.cens[S.cen], B=c.verba;
   if(!S.dig) S.dig=Object.keys(c.ww);
-  const ww=pesos(p.pacote,S.cen,S.dig);
+  const ww0=pesos(p.pacote,S.cen,S.dig);
   const offSel=offDisponiveis().filter(o=>S.off[o.id]);
   const offMes=offSel.filter(o=>o.un!=="campanha"&&o.un!=="ação").reduce((s,o)=>s+(o.valor||0),0);
   const offPont=offSel.filter(o=>o.un==="campanha"||o.un==="ação").reduce((s,o)=>s+(o.valor||0),0);
@@ -168,15 +174,16 @@ function renderPersonal(){
   const offEff=Math.max(offMes,offMin), aDefinir=Math.max(offMin-offMes,0);
   const D=Math.max(base-offEff,B*P.digMin);
   const total=D+offEff;
+  const ww=aplicaMinimo(ww0,D), semMin=Object.keys(ww0).filter(i=>!ww[i]);
   const alloc={}; Object.entries(ww).forEach(([i,f])=>alloc[i]=D*f);
   const leads=D/cplMix(ww); // mesmo custo por contato médio usado nos cenários do passo 5
   const cli=Math.round(leads*P.conv);
-  const roi=cli*P.tmed/total;
+  const roi=D>0?cli*P.tmed/D:0; // ROI do digital: a mídia off não tem clientes medidos
   // digital
   const cor=cssv(PK[p.pacote].cor);
-  $("dig").innerHTML=Object.keys(DIG).map(i=>{const on=!!ww[i];const v=alloc[i]||0;const pad=W[p.pacote][i]>0;
-    return `<label class="item${on?"":" off"}"><input type="checkbox" data-dig="${i}" ${on?"checked":""}>
-      <span class="itxt"><b>${DIG[i].canal}${pad?"":' <em class="opt">opcional</em>'}</b><span>${DIG[i].desc}</span>
+  $("dig").innerHTML=Object.keys(DIG).map(i=>{const on=!!ww[i];const v=alloc[i]||0;const pad=W[p.pacote][i]>0;const baixo=semMin.includes(i);
+    return `<label class="item${on?"":" off"}"><input type="checkbox" data-dig="${i}" ${on||baixo?"checked":""}>
+      <span class="itxt"><b>${DIG[i].canal}${pad?"":' <em class="opt">opcional</em>'}</b><span>${baixo?`Fica fora: a parte dele não chega ao mínimo de ${brl(P.minCanal)} por mês, e a verba foi para os outros canais.`:DIG[i].desc}</span>
       ${on?`<span class="bar"><i style="width:${Math.round(ww[i]*100)}%;background:${cor}"></i></span>`:""}</span>
       <span class="ival num">${on?brl(v)+"<small>/mês</small>":"-"}</span></label>`;}).join("");
   $("dig").querySelectorAll("input[data-dig]").forEach(cb=>cb.onchange=()=>{
@@ -240,10 +247,12 @@ function go(n){
 function validStep(){
   if(STEP===1&&(!$("resp").value.trim()||$("resp").value.length>120)) return "Informe seu nome para continuar.";
   if(STEP===3){const c=+$("cap").value,a=+$("atual").value,d=+$("desej").value;
+    if(["cap","atual","desej"].some(id=>$(id).value.trim()===""||+$(id).value<0||!Number.isInteger(+$(id).value))) return "Use números inteiros de carros por dia, sem deixar campo vazio.";
     if(!(c>0)) return "Informe quantos carros a loja consegue atender por dia.";
     if(![c,a,d].every(Number.isSafeInteger)||a<0||c>10000) return "Use números inteiros entre 0 e 10.000.";
     if(a>c||d>c) return "Os carros atendidos e desejados não podem passar da capacidade.";
-    if(!(d>0)) return "Informe quantos carros você gostaria de atender por dia.";}
+    if(!(d>0)) return "Informe quantos carros você gostaria de atender por dia.";
+    if(S.nova==="sim"&&!(d>a)) return "Loja nova: a meta de carros por dia precisa ser maior do que o atendimento de hoje.";}
   return "";
 }
 $("btnNext").onclick=()=>{const e=validStep(); if(e){$("stepErr").textContent=e;$("stepErr").classList.remove("hidden");return;} go(STEP+1);};
@@ -337,7 +346,7 @@ async function makePDF(r){
   h("Diagnóstico informado");
   box([["Capacidade",r.cap+" carros/dia"],["Atende hoje",r.atual+" carros/dia"],["Quer atender",r.desej+" carros/dia"],["Agenda",r.agenda]]);
   h("Projeção mensal");
-  box([["Investimento",brl(r.verba)],["Clientes novos (digital)",String(r.cli)],["ROI estimado",x1(r.roi)],["Carros que pagam a mídia",String(Math.ceil(r.verba/P.tmed))]]);
+  box([["Investimento",brl(r.verba)],["Clientes novos (digital)",String(r.cli)],["ROI do digital",x1(r.roi)],["Carros que pagam o digital",String(Math.ceil((r.digital||r.verba)/P.tmed))]]);
   h("Mídia digital");
   d.setDrawColor(226,224,216); d.setFontSize(10);
   r.itens.forEach(it=>{page();d.line(M,y-4.5,W_-M,y-4.5);d.setFont("helvetica","normal");d.text(it.canal,M,y);d.text(brl(it.valor)+"/mês",W_-M,y,{align:"right"});y+=7;});
@@ -358,7 +367,7 @@ async function makePDF(r){
   d.setFont("helvetica","bold"); d.setFontSize(10.5); d.text("Total do primeiro mês: "+brl(r.verba+r.pontual),M+4,y+7);
   d.setFont("helvetica","normal"); d.setFontSize(8.5); d.text("A verba de mídia é investida pela loja. A Layer Up revisa o plano a cada trimestre.",M+4,y+13);
   d.setFontSize(7.5); d.setTextColor(107,106,100);
-  d.text(d.splitTextToSize("ROI = receita estimada das lavagens (ticket médio de R$ 135) dividida pelo investimento. Custos por contato são referências da Layer Up; mídia off com preços de tabela do Canal do Mídia em 13/11/2026, sujeitos a disponibilidade; 40% dos contatos viram cliente (hipótese a calibrar no piloto). Projeções não são garantia de resultado.",W_-2*M),M,284);
+  d.text(d.splitTextToSize("ROI do digital = receita estimada das lavagens (ticket médio de R$ 135) dividida pelo investimento em mídia digital; a mídia off não entra no cálculo. Custos por contato são referências da Layer Up; mídia off com preços de tabela do Canal do Mídia em 13/11/2026, sujeitos a disponibilidade; 40% dos contatos viram cliente (hipótese a calibrar no piloto). Projeções não são garantia de resultado.",W_-2*M),M,284);
   return d.output("blob");
 }
 
