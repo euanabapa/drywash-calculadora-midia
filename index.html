@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzxmmeqmykgcvdccaqgr.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de Mídia Local DryWash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<script defer src="jspdf.umd.min.js"></script>
+<script src="supabase.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  /* Layout: assistente de 4 passos em coluna única; painel interno em tabela larga. Cores da marca DryWash. */
+  --yellow:#FFEC00; --blue:#004F9E; --ink:#14213D; --paper:#FFFFFF; --wash:#F4F6FA; --line:#DDE3EC; --muted:#5E6B7E;
+  --good:#1E7A46; --warn:#B4231B;
+  --p-atrair:#007544; --p-conquistar:#7A3FD1; --p-volta:#0085AE; --p-manter:#E8742A;
+  --f-display:"Montserrat", Arial, sans-serif; --f-body:"Inter Tight", Arial, sans-serif;
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--wash);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+header.top{background:var(--yellow);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header.top img{height:40px;width:auto;display:block}
+.sub{font:600 12px var(--f-display);color:var(--blue)}
+.demo{background:var(--blue);color:#fff;font:700 10.5px/1 var(--f-display);padding:6px 9px;border-radius:99px;letter-spacing:.06em}
+nav.tabs{margin-left:auto;display:flex;gap:6px}
+nav.tabs a{font:600 13px var(--f-display);color:var(--blue);text-decoration:none;padding:8px 12px;border-radius:8px}
+nav.tabs a[aria-current="page"]{background:var(--blue);color:#fff}
+main{max-width:1180px;margin:0 auto;padding:24px 16px 48px}
+.intro{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.intro h1{font-size:26px}
+.intro p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr !important}}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+label{display:block;font-size:12.5px;font-weight:600;margin-bottom:5px}
+input,select{width:100%;font:inherit;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--yellow);outline-offset:1px;border-color:var(--blue)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:12px;background:var(--wash);border:1px solid var(--line);padding:3px 8px;border-radius:6px}
+.stack{display:grid;gap:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font:600 11.5px var(--f-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 6px}
+td{border-bottom:1px solid var(--line);padding:9px 6px;vertical-align:top}
+td.r,th.r{text-align:right}
+.bar{display:block;height:6px;border-radius:4px;background:var(--wash);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%}
+.cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{font:700 14px var(--f-display);border:0;border-radius:10px;padding:13px 20px;cursor:pointer}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;border:1.5px solid var(--blue);color:var(--blue)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.big{width:100%;padding:16px;font-size:16px}
+.note{font-size:12px;color:var(--muted)}
+.ok{background:#E6F4EC;border:1px solid #BFE0CC;color:var(--good);padding:12px 14px;border-radius:10px;font-size:13.5px}
+.err{background:#FBEAE9;border:1px solid #F0C4C1;color:var(--warn);padding:10px 14px;border-radius:10px;font-size:13.5px;margin-top:12px}
+.err:empty{display:none}
+.pill{display:inline-block;font:700 11px var(--f-display);padding:4px 8px;border-radius:99px;color:#fff;white-space:nowrap}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media (max-width:760px){.tiles{grid-template-columns:1fr 1fr}}
+.tile{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px}
+.tile span{font-size:12px;color:var(--muted)}
+.tile b{display:block;font:800 24px var(--f-display);margin-top:4px}
+.scroll{overflow-x:auto}
+/* assistente */
+.wiz{max-width:760px;margin:0 auto}
+.progress{list-style:none;padding:0;margin:0 0 26px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;counter-reset:st}
+.progress li{counter-increment:st;font:600 12px var(--f-display);color:var(--muted);padding-top:10px;border-top:4px solid var(--line);cursor:default}
+.progress li::before{content:counter(st) ". "}
+.progress li.done{border-color:var(--blue);color:var(--blue);cursor:pointer}
+.progress li.cur{border-color:var(--yellow);color:var(--ink)}
+.pane{display:none}
+.pane.on{display:block}
+.eyebrow{font:700 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.pane > h1{font-size:28px;margin-bottom:6px}
+.lead{color:var(--muted);margin:0 0 6px;max-width:62ch}
+.q{margin-top:22px}
+.q > label,.qlabel{font:700 15px var(--f-display);margin:0 0 8px;display:block}
+.q .hint{display:block;font:400 13px var(--f-body);color:var(--muted);margin-top:2px}
+.q select,.q input[type=text]{font-size:17px;padding:13px 14px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.choices{grid-template-columns:1fr}}
+.choice{text-align:left;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:14px;cursor:pointer;font:inherit;color:var(--ink)}
+.choice b{display:block;font:700 15px var(--f-display)}
+.choice span{font-size:13px;color:var(--muted)}
+.choice[aria-pressed="true"]{border-color:var(--blue);background:#EEF4FB;box-shadow:inset 0 0 0 1px var(--blue)}
+.info{margin-top:22px;background:var(--paper);border:1px dashed var(--blue);border-radius:12px;padding:12px 14px;font-size:14px}
+.cars{display:grid;gap:12px;margin-top:20px}
+.carq{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.carq b{font:700 15px var(--f-display);display:block}
+.carq span{font-size:13px;color:var(--muted)}
+.stepper{display:flex;gap:6px;align-items:center}
+.stepper button{width:44px;height:44px;border:1.5px solid var(--blue);background:var(--paper);color:var(--blue);border-radius:10px;font:700 20px var(--f-display);cursor:pointer}
+.stepper input{width:78px;text-align:center;font:700 18px var(--f-display);padding:10px 4px}
+@media (max-width:520px){.carq{grid-template-columns:1fr}}
+.peek{margin-top:20px;background:var(--blue);color:#fff;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13.5px}
+.peek:empty{display:none}
+.peek b{color:var(--yellow);font-family:var(--f-display)}
+.pk{border-radius:12px;padding:16px 18px;color:#fff;display:flex;justify-content:space-between;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:16px}
+.pk .lbl{font:600 11px var(--f-display);letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.pk .name{font:800 24px var(--f-display)}
+.pk .why{font-size:13.5px;opacity:.95;max-width:42ch}
+.cens{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+@media (max-width:640px){.cens{grid-template-columns:1fr}}
+.cen{position:relative;text-align:left;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:16px 14px 14px;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:8px}
+.cen[aria-pressed="true"]{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background:#F5F9FE}
+.rec{position:absolute;top:-10px;left:12px;background:var(--yellow);color:var(--blue);font:800 10.5px var(--f-display);padding:3px 8px;border-radius:99px;letter-spacing:.04em;text-transform:uppercase}
+.cname{font:700 14px var(--f-display)}
+.cval{font:800 22px var(--f-display);color:var(--blue)}
+.cval small{font-size:12px;font-weight:600;color:var(--muted)}
+.cdl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}
+.cdl dt{color:var(--muted)}
+.cdl dd{margin:0;font-weight:600}
+.cmuda{margin:0;font-size:13px;border-top:1px solid var(--line);padding-top:8px}
+.cquem{margin:0;font-size:12px;color:var(--muted)}
+.roi{margin-top:12px;font-size:13px;background:var(--paper);border-left:4px solid var(--yellow);padding:10px 12px;border-radius:0 10px 10px 0}
+.lanc{margin-top:12px;border-left:4px solid var(--yellow);background:#FFFBD6;padding:10px 12px;border-radius:0 10px 10px 0;font-size:13.5px}
+.msgk{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.msgk div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px}
+.msgk small{display:block;font:700 11px var(--f-display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.item{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:start;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;margin:0;font-weight:400}
+.item input{width:18px;height:18px;margin-top:2px}
+.item.fixed{cursor:default}
+.coff{display:block;font-size:12px;margin:2px 0 4px;color:var(--ink)}
+.reserva{background:#FFFBD6;border-left:4px solid var(--yellow);border-radius:0 10px 10px 0;padding:10px 12px;margin:10px 0 4px;font-size:13.5px}
+.reserva .rb{height:8px;background:#fff;border-radius:6px;overflow:hidden;margin-top:6px;border:1px solid var(--line)}
+.reserva .rb i{display:block;height:100%;background:var(--blue)}
+.item.ph{grid-template-columns:22px 84px 1fr auto}
+.item.ph img,.phw{position:relative;display:block;width:84px;height:63px}
+.ilus{position:absolute;left:3px;bottom:3px;background:rgba(20,33,61,.82);color:#fff;font:600 8.5px/1 var(--f-display);font-style:normal;padding:3px 4px;border-radius:4px}
+.item.ph .noimg{width:84px;height:63px;object-fit:cover;border-radius:8px;background:var(--paper);border:1px solid var(--line)}
+.item.ph .noimg{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);text-align:center}
+.ogrp{font:700 11px var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin:16px 0 2px;display:flex;justify-content:space-between}
+.ogrp span{color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0}
+.dist{display:inline-block;background:var(--yellow);color:var(--ink);font:700 11px var(--f-display);border-radius:20px;padding:1px 7px;margin-right:4px}
+.avis5{background:#FFF1E6;border-left:4px solid #E8742A;padding:8px 10px;border-radius:0 8px 8px 0;font-size:13px;margin:8px 0}
+.item.off .itxt,.item.off .ival{opacity:.45}
+.itxt b{display:block;font:700 14px var(--f-display)}
+.itxt span{font-size:13px;color:var(--muted)}
+.ival{font:700 15px var(--f-display);text-align:right;white-space:nowrap}
+.ival small{font-size:11px;color:var(--muted)}
+.totais{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.totais div{background:var(--blue);color:#fff;border-radius:10px;padding:10px 12px}
+.totais span{font-size:11.5px;opacity:.85}
+.totais b{display:block;font:800 18px var(--f-display);color:var(--yellow)}
+@media (max-width:560px){.totais{grid-template-columns:1fr 1fr}}
+.check{display:flex;gap:10px;align-items:flex-start;margin:18px 0 12px;font-size:14px;font-weight:400}
+.check input{width:18px;height:18px;margin-top:2px;flex:none}
+.navbtns{display:flex;justify-content:space-between;gap:10px;margin-top:28px}
+.progress{grid-template-columns:repeat(6,1fr) !important}
+@media (max-width:560px){.progress li{font-size:0}.progress li::before{font-size:12px}}
+.matriz{display:grid;grid-template-columns:110px 1fr 1fr;gap:10px;margin-top:18px;align-items:stretch}
+.matriz .ax-col{font:700 12px var(--f-display);text-transform:uppercase;letter-spacing:.05em;color:var(--blue);text-align:center}
+.matriz .ax-col:first-child{grid-column:2}
+.matriz .ax-row{font:700 12px var(--f-display);color:var(--muted);display:flex;align-items:center;text-transform:uppercase;letter-spacing:.04em}
+.mcard{--c:#004F9E;text-align:left;border:2px solid var(--line);background:var(--paper);border-radius:14px;padding:16px;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:6px;border-top:8px solid var(--c)}
+.mcard b{font:800 18px var(--f-display);color:var(--c)}
+.mcard span{font-size:14px}
+.mcard small{font-size:12px;color:var(--muted)}
+.mcard[disabled]{opacity:.38;cursor:not-allowed}
+.mcard[aria-pressed="true"]{border-color:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent);background:color-mix(in srgb,var(--c) 6%,white)}
+@media (max-width:560px){.matriz{grid-template-columns:1fr 1fr}.matriz .ax-row{grid-column:1/-1}.matriz .ax-col:first-child{grid-column:1}}
+.ctit{font:700 15px var(--f-display)}
+.csub{font-size:13.5px}
+.cmeta{font-size:12.5px;color:var(--muted)}
+.cch{font-size:12px;color:var(--muted)}
+.gbar{position:relative;height:10px;background:var(--wash);border-radius:6px;margin-top:4px}
+.gbar i{position:absolute;top:0;height:100%;border-radius:6px}
+.gbar .g0{left:0;background:#9FB3CC}
+.gbar .g1{background:var(--blue)}
+.gbar .gm{position:absolute;top:-4px;width:2px;height:18px;background:var(--ink)}
+.glab{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.regra{margin-top:14px;background:#EEF4FB;border:1px solid #C9DAF0;border-radius:10px;padding:10px 14px;font-size:14px}
+.regra.alert{background:#FFF6D6;border-color:#F0D97A}
+.opt{font:600 10.5px var(--f-body);font-style:normal;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:1px 7px;margin-left:6px;text-transform:none;letter-spacing:0}
+input[type=file]{padding:10px;background:var(--wash)}
+.matriz.ex .mcard{cursor:default}
+.fases{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.fases div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+.fases .fn{grid-row:span 2;width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--blue);display:grid;place-items:center;font:800 14px var(--f-display)}
+.fases b{font:700 14px var(--f-display)}
+.fases span:last-child{font-size:13px;color:var(--muted)}
+@media (max-width:560px){.fases{grid-template-columns:1fr}}
+.rowhint{margin-top:18px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.mini{display:grid;grid-template-columns:repeat(2,22px);gap:4px}
+.mini i{width:22px;height:16px;border-radius:4px;background:var(--line)}
+.mini i.on{background:var(--blue)}
+.matriz.sel .ax-row.hide,.matriz.sel .mcard.hide{display:none}
+.matriz.sel{grid-template-columns:110px 1fr 1fr}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<header class="top">
+  <img id="logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjEuOTUgOTUuMTUiPjxyZWN0IGZpbGw9IiNmZmVjMDAiIHdpZHRoPSIzMjIuMTciIGhlaWdodD0iOTUuNDkiLz48ZyBmaWxsPSIjMDA0ZjllIj48cGF0aCBkPSJNMjQyLjk1LDYxLjE3aDkuMTV2LTExLjE4YzAtMi44OC40Ny00Ljk4LDEuNDItNi4zLjk1LTEuMzIsMi4zNy0xLjk4LDQuMjctMS45OCwxLjI1LDAsMi4yNy40OSwzLjA1LDEuNDcuNzguOTgsMS4xNywyLjcxLDEuMTcsNS4xOXYxMi44MWg5LjE1di0xNi41MmMwLTEuMzYtLjE5LTIuNjgtLjU2LTMuOTYtLjM3LTEuMjktLjk3LTIuNDEtMS43OC0zLjM4LS44MS0uOTctMS44Ni0xLjc1LTMuMTUtMi4zNC0xLjI5LS41OS0yLjgzLS44OS00LjYzLS44OS0yLDAtMy43My40MS01LjE5LDEuMjItMS40Ni44MS0yLjY4LDEuOTEtMy42NiwzLjNoLS4xdi0xNS41NmgtOS4xNXYzOC4xM1oiLz48cGF0aCBkPSJNMjE5LjA2LDYwLjVjMS4zNi40NCwyLjc4Ljc2LDQuMjcuOTcsMS40OS4yLDMuMjcuMzEsNS4zNC4zMSwxLjQ5LDAsMi45Ny0uMTMsNC40NS0uMzgsMS40Ny0uMjUsMi44LS43MSwzLjk3LTEuMzcsMS4xNy0uNjYsMi4xMi0xLjU3LDIuODUtMi43Mi43My0xLjE1LDEuMDktMi42MSwxLjA5LTQuMzcsMC0xLjY2LS4zNC0zLTEuMDItNC4wMi0uNjgtMS4wMi0xLjUyLTEuODEtMi41Mi0yLjM5LTEtLjU4LTIuMDktMS4wMS0zLjI4LTEuMy0xLjE5LS4yOS0yLjI4LS41Ni0zLjI4LS44MS0xLS4yNS0xLjg0LS41NS0yLjUyLS44OS0uNjgtLjM0LTEuMDItLjg1LTEuMDItMS41MiwwLS4zNy4xMy0uNjguMzgtLjkyLjI1LS4yNC41OC0uNDIuOTktLjU2LjQxLS4xNC44Ni0uMjMsMS4zNS0uMjguNDktLjA1Ljk5LS4wOCwxLjUtLjA4LDEuMTUsMCwyLjM4LjE1LDMuNjkuNDYsMS4zLjMxLDIuNDUuNzUsMy40MywxLjMybC43MS02LjM1Yy0xLjQ5LS41OC0zLjAyLS45Ny00LjU4LTEuMTktMS41Ni0uMjItMy4xMy0uMzMtNC43My0uMzMtMS4zMiwwLTIuNjUuMTYtMy45OS40OC0xLjM0LjMyLTIuNTUuODMtMy42MywxLjUyLTEuMDguNy0xLjk3LDEuNTgtMi42NCwyLjY3LS42OCwxLjA4LTEuMDIsMi4zOS0xLjAyLDMuOTFzLjMyLDIuODYuOTcsMy44MWMuNjQuOTUsMS40NSwxLjcsMi40MSwyLjI2Ljk3LjU2LDIuMDEuOTgsMy4xMywxLjI3LDEuMTIuMjksMi4xNi41NywzLjEzLjg0Ljk3LjI3LDEuNzcuNiwyLjQyLjk5LjY0LjM5Ljk3Ljk2Ljk3LDEuNywwLC45Mi0uMzgsMS41LTEuMTQsMS43NS0uNzYuMjUtMS42Mi4zOC0yLjU3LjM4LTEuNjYsMC0zLjI0LS4xOS00LjczLS41Ni0xLjQ5LS4zNy0yLjc4LS44LTMuODYtMS4yN2wtLjUxLDYuNjZaIi8+PHBhdGggZD0iTTEwNi43NywzNC4zOGMtLjQ3LS4wNy0uOTctLjE0LTEuNS0uMi0uNTItLjA3LTEuMDYtLjEtMS42LS4xLTIsMC0zLjYxLjQ5LTQuODMsMS40Ny0xLjIyLjk4LTIuMjIsMi4zMi0zLDQuMDJoLS4xdi00Ljg4aC04LjM0djI2LjQ5aDkuMTV2LTExLjE4YzAtMi42MS41OC00LjY0LDEuNzMtNi4xLDEuMTUtMS40NiwyLjgtMi4xOSw0LjkzLTIuMTkuNTQsMCwxLjA3LDAsMS41OC4wMi41MS4wMiwxLjAyLjExLDEuNTMuMjhsLjQ2LTcuNjNaIi8+PHBhdGggZD0iTTIxNS44Miw2MS4xN2MtLjItMS4wNS0uMzQtMi4wOS0uNDEtMy4xMy0uMDctMS4wMy0uMS0yLjA4LS4xLTMuMTN2LTkuODZjMC0yLjAzLS4zNC0zLjc0LTEuMDItNS4xMy0uNjgtMS4zOS0xLjU5LTIuNTItMi43NC0zLjM4LTEuMTUtLjg2LTIuNDktMS40OS00LjAyLTEuODgtMS41Mi0uMzktMy4xMy0uNTgtNC44My0uNTgtMS45NywwLTMuODEuMTQtNS41NC40My0xLjczLjI5LTMuNDEuNzctNS4wMywxLjQ1bC4xNSw2LjJjMS4yOS0uNzEsMi42NC0xLjIyLDQuMDctMS41MywxLjQyLS4zMSwyLjg4LS40Niw0LjM3LS40Ni44MSwwLDEuNTguMDcsMi4zMS4yLjczLjE0LDEuMzcuMzgsMS45My43NC41Ni4zNiwxLC44MiwxLjMyLDEuNC4zMi41OC40OCwxLjMyLjQ4LDIuMjQtLjU4LS4xLTEuMjUtLjE5LTIuMDEtLjI1LS43Ni0uMDctMS41Mi0uMS0yLjI2LS4xLTEuMjIsMC0yLjYyLjA5LTQuMTkuMjgtMS41OC4xOS0zLjA3LjU5LTQuNDcsMS4yMi0xLjQxLjYzLTIuNTksMS41My0zLjU2LDIuNzItLjk3LDEuMTktMS40NSwyLjgtMS40NSw0LjgzLDAsMS40Mi4yNywyLjY2LjgxLDMuNzEuNTQsMS4wNSwxLjI3LDEuOTIsMi4xOSwyLjYyLjkyLjcsMS45NywxLjIsMy4xNSwxLjUzLDEuMTkuMzIsMi40NC40OCwzLjc2LjQ4LDEuOSwwLDMuNTEtLjM4LDQuODMtMS4xNCwxLjMyLS43NiwyLjUxLTEuOTcsMy41Ni0zLjYzaC4xYzAsLjY4LjAzLDEuMzYuMDgsMi4wNi4wNS42OS4wOSwxLjQuMTMsMi4xMWg4LjM5Wk0xOTcuMzcsNTIuNzhjMC0xLjI5LjUzLTIuMTksMS42LTIuNzIsMS4wNy0uNTMsMi4zOC0uNzksMy45NC0uNzkuNjgsMCwxLjM1LjAyLDIuMDEuMDUuNjYuMDMsMS4yOC4wNywxLjg2LjEsMCwuNzgtLjE0LDEuNTQtLjQxLDIuMjktLjI3Ljc1LS42NCwxLjQxLTEuMTIsMi4wMS0uNDcuNTktMS4wNywxLjA3LTEuNzgsMS40Mi0uNzEuMzYtMS40OS41My0yLjM0LjUzLTEuMDgsMC0xLjk4LS4yNS0yLjY5LS43Ni0uNzEtLjUxLTEuMDctMS4yMi0xLjA3LTIuMTRaIi8+PHBvbHlnb24gcG9pbnRzPSIxNDguNzcgNjEuMTcgMTYxLjAyIDYxLjE3IDE2NS43IDMzLjkyIDE2NS44IDMzLjkyIDE3MC44MyA2MS4xNyAxODIuOTggNjEuMTcgMTkwLjkxIDI1LjY4IDE4MS43MSAyNS42OCAxNzcuMDggNTIuOTMgMTc2Ljk4IDUyLjkzIDE3MiAyNS42OCAxNjAgMjUuNjggMTU1LjIzIDUyLjkzIDE1NS4xMiA1Mi45MyAxNTAuNTUgMjUuNjggMTQwLjg5IDI1LjY4IDE0OC43NyA2MS4xNyIvPjxwYXRoIGQ9Ik0xMTAuNyw3MS44NGMxLjg2LjQxLDMuNzYuNjEsNS42OS42MSwyLjEsMCwzLjg0LS4zNyw1LjIxLTEuMTIsMS4zNy0uNzUsMi41Mi0xLjczLDMuNDYtMi45NS45My0xLjIyLDEuNzItMi42MiwyLjM2LTQuMTkuNjQtMS41OCwxLjI5LTMuMTksMS45My00Ljg1bDkuNzEtMjQuNjVoLTkuMTVsLTUuNDQsMTcuMjhoLS4xbC01LjY5LTE3LjI4aC05Ljg2bDEwLjczLDI3LjFjLS4zNCwxLjE5LS45MiwyLjA5LTEuNzMsMi43Mi0uODEuNjMtMS43OC45NC0yLjkuOTQtLjY0LDAtMS4yNS0uMDQtMS44My0uMTMtLjU4LS4wOC0xLjE3LS4yMy0xLjc4LS40M2wtLjYxLDYuOTZaIi8+PHBhdGggZD0iTTUxLjAxLDYxLjE3aDEyLjkxYzMuMDIsMCw1LjgxLS4zMSw4LjM5LS45NCwyLjU4LS42Myw0LjgtMS42NCw2LjY2LTMuMDUsMS44Ni0xLjQxLDMuMzItMy4yNCw0LjM3LTUuNTIsMS4wNS0yLjI3LDEuNTgtNS4wNywxLjU4LTguMzlzLS41Mi02LjI3LTEuNTUtOC41NGMtMS4wMy0yLjI3LTIuNDctNC4wOC00LjMyLTUuNDEtMS44NS0xLjM0LTQuMDYtMi4yOC02LjYzLTIuODItMi41OC0uNTQtNS40MS0uODEtOC40OS0uODFoLTEyLjkxdjM1LjQ4Wk02MC40NiwzMi43aDMuNjZjMy40OSwwLDYuMi45LDguMTMsMi42OSwxLjkzLDEuOCwyLjksNC40NywyLjksOC4wM3MtLjk1LDYuMjQtMi44NSw4LjAzYy0xLjksMS44LTQuNjMsMi42OS04LjE4LDIuNjloLTMuNjZ2LTIxLjQ1WiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTI2Ny4yMSwyNS4xM2guNDljLjI0LDAsLjQyLjA1LjU0LjE0LjEyLjA5LjE4LjIyLjE4LjM5LDAsLjE3LS4wNy4zMS0uMi40MS0uMTQuMS0uMzMuMTUtLjU3LjE1aC0uNDR2LTEuMDlaTTI2OS43MiwyNC40OGMtLjUtLjUtMS4xOS0uODEtMS45Ni0uODFzLTEuNDYuMzEtMS45Ni44MWMtLjUuNS0uODEsMS4xOS0uODEsMS45NnMuMzEsMS40Ni44MSwxLjk2Yy41LjUsMS4xOS44MSwxLjk2LjgxczEuNDYtLjMxLDEuOTYtLjgxYy41LS41LjgxLTEuMTkuODEtMS45NnMtLjMxLTEuNDYtLjgxLTEuOTZaTTI2Ny43NywyMy4wNGMuOTQsMCwxLjc5LjM4LDIuNC45OS42Mi42MiwxLDEuNDcsMSwyLjRzLS4zOCwxLjc5LTEsMi40Yy0uNjEuNjItMS40NiwxLTIuNCwxcy0xLjc5LS4zOC0yLjQtLjk5Yy0uNjEtLjYxLS45OS0xLjQ2LS45OS0yLjRzLjM4LTEuNzkuOTktMi40Yy42Mi0uNjEsMS40Ny0uOTksMi40LS45OVpNMjY2LjcsMjguMjdoLjUxdi0xLjU5aC4zMWMuMDcsMCwuMTMsMCwuMTksMCwuMDYsMCwuMTEuMDIuMTYuMDQuMDUuMDIuMDkuMDYuMTMuMTEuMDQuMDUuMDguMTEuMTIuMmwuNTUsMS4yNGguNTlsLS42OC0xLjQzYy0uMDYtLjExLS4xMS0uMTktLjE2LS4yNC0uMDUtLjA1LS4xMS0uMDktLjE5LS4xMmgwYy4xLS4wMy4yLS4wNi4yOS0uMTEuMDktLjA1LjE3LS4xLjI0LS4xNy4wNy0uMDcuMTItLjE1LjE2LS4yNC4wNC0uMDkuMDYtLjE5LjA2LS4zLDAtLjIyLS4wNC0uMzktLjEyLS41MS0uMDgtLjEzLS4xOC0uMjItLjMxLS4yOS0uMTMtLjA3LS4yOC0uMTEtLjQ0LS4xMy0uMTctLjAyLS4zNC0uMDMtLjUyLS4wM2gtLjg4djMuNTlaIi8+PC9nPjwvc3ZnPgo=" alt="DryWash">
+  <span class="sub">Mídia paga local · Layer Up</span>
+  <span class="demo">PLANEJAMENTO</span>
+  <nav class="tabs" aria-label="Visões">
+    <a href="#calculadora" id="navCalc">Calculadora do franqueado</a>
+    <a href="#painel" id="navPainel" class="hidden">Painel interno</a>
+  </nav>
+</header>
+<main>
+<section class="card" style="margin-bottom:20px" aria-label="Acesso">
+  <p id="authStatus" class="note">Você pode simular sem entrar. Entre para registrar o plano e enviar sua lista de clientes.</p>
+  <form id="authForm" class="cta"><label for="authEmail">E-mail de acesso</label><input id="authEmail" type="email" required autocomplete="email" maxlength="254" style="max-width:300px"><button class="btn ghost" id="authLogin" type="submit">Receber link de acesso</button></form>
+  <button id="authLogout" class="btn ghost hidden" type="button">Sair</button><p id="authNote" class="note" role="status"></p>
+</section>
+<section id="viewCalc">
+  <div class="wiz">
+    <ol class="progress" id="progress" aria-label="Etapas">
+      <li data-s="1">Sua loja</li><li data-s="2">Como funciona</li><li data-s="3">Agenda</li><li data-s="4">Público</li><li data-s="5">Investimento</li><li data-s="6">Personalize e aprove</li>
+    </ol>
+
+    <div class="pane" data-step="1">
+      <p class="eyebrow">Passo 1 de 6</p>
+      <h1>Qual é a sua loja?</h1>
+      <p class="lead">Vamos montar um plano de mídia sob medida para ela. Leva cerca de 3 minutos.</p>
+      <div class="q">
+        <label for="loja">Unidade</label>
+        <select id="loja"></select>
+        <div class="tags" id="lojaTags"></div>
+      </div>
+      <div class="q">
+        <label for="resp">Seu nome<span class="hint">Quem vai aprovar o plano</span></label>
+        <input maxlength="120" id="resp" type="text" placeholder="Ex.: Ana Souza" autocomplete="name">
+      </div>
+      <div class="q">
+        <label>A loja vai abrir ou abriu há menos de 2 meses?</label>
+        <div class="choices" id="novaChips">
+          <button type="button" class="choice" data-v="nao" aria-pressed="true"><b>Não, já opera</b><span>Plano contínuo de mídia</span></button>
+          <button type="button" class="choice" data-v="sim" aria-pressed="false"><b>Sim, é nova</b><span>Inclui 8 semanas de lançamento</span></button>
+        </div>
+      </div>
+      <p class="info">O plano começa em <b class="inicio"></b>, sempre no mês seguinte à aprovação.</p>
+    </div>
+
+    <div class="pane" data-step="2">
+      <p class="eyebrow">Passo 2 de 6</p>
+      <h1>Como escolhemos o plano da sua loja</h1>
+      <p class="lead">Existem quatro tipos de plano. O seu sai de duas respostas: como está a sua agenda e quem é a maioria dos seus clientes.</p>
+      <div class="matriz ex">
+        <span class="ax ax-col">Gente de passagem</span><span class="ax ax-col">Sempre as mesmas pessoas</span>
+        <span class="ax ax-row">Agenda com vagas</span>
+        <div class="mcard" style="--c:#007544"><b>Atrair quem passa</b><span>Transformar quem circula no shopping, mercado ou aeroporto em cliente.</span></div>
+        <div class="mcard" style="--c:#7A3FD1"><b>Conquistar a casa</b><span>Fazer quem frequenta o prédio ou o clube experimentar o serviço.</span></div>
+        <span class="ax ax-row">Agenda cheia</span>
+        <div class="mcard" style="--c:#0085AE"><b>Trazer de volta</b><span>Fazer quem já lavou voltar, de preferência nos dias mais vazios.</span></div>
+        <div class="mcard" style="--c:#E8742A"><b>Manter aquecido</b><span>Manter os clientes da casa voltando, com ofertas de fidelidade.</span></div>
+      </div>
+      <div class="fases">
+        <div><span class="fn">1</span><b>Agenda</b><span>No próximo passo, você conta quantos carros atende. Isso define a linha.</span></div>
+        <div><span class="fn">2</span><b>Público</b><span>Depois, você escolhe quem é seu cliente. Isso define a coluna e o seu plano.</span></div>
+      </div>
+    </div>
+
+    <div class="pane" data-step="3">
+      <p class="eyebrow">Passo 3 de 6</p>
+      <h1>Como está a agenda da loja?</h1>
+      <p class="lead">Use números aproximados, em carros por dia. Eles definem o tamanho da campanha.</p>
+      <div class="cars">
+        <div class="carq"><div><b>Quantos carros a loja consegue atender por dia?</b><span>Capacidade máxima da operação</span></div>
+          <div class="stepper"><button type="button" data-t="cap" data-d="-1" aria-label="Menos um">−</button><input id="cap" type="number" min="1" max="200" value="12" inputmode="numeric" aria-label="Capacidade por dia"><button type="button" data-t="cap" data-d="1" aria-label="Mais um">+</button></div></div>
+        <div class="carq"><div><b>Hoje, quantos carros a loja tem atendido por dia?</b><span>Média de um dia comum</span></div>
+          <div class="stepper"><button type="button" data-t="atual" data-d="-1" aria-label="Menos um">−</button><input id="atual" type="number" min="0" max="200" value="7" inputmode="numeric" aria-label="Atendidos hoje por dia"><button type="button" data-t="atual" data-d="1" aria-label="Mais um">+</button></div></div>
+        <div class="carq"><div><b>Quantos carros você gostaria de atender por dia?</b><span>Uma meta realista para os próximos meses</span></div>
+          <div class="stepper"><button type="button" data-t="desej" data-d="-1" aria-label="Menos um">−</button><input id="desej" type="number" min="0" max="200" value="9" inputmode="numeric" aria-label="Meta por dia"><button type="button" data-t="desej" data-d="1" aria-label="Mais um">+</button></div></div>
+      </div>
+      <p class="err" id="capErr"></p>
+      <div class="rowhint" id="rowHint"></div>
+    </div>
+
+    <div class="pane" data-step="4">
+      <p class="eyebrow">Passo 4 de 6</p>
+      <h1>Quem é a maioria dos seus clientes?</h1>
+      <p class="lead" id="agendaTxt"></p>
+      <div class="matriz sel">
+        <span class="ax ax-col">Gente de passagem</span><span class="ax ax-col">Sempre as mesmas pessoas</span>
+        <span class="ax ax-row r1" data-row="vagas">Agenda com vagas</span>
+        <button type="button" class="mcard" data-k="Atrair quem passa"><b>Atrair quem passa</b><span>Transformar quem circula no shopping, mercado ou aeroporto em cliente.</span><small>Ex.: shopping, supermercado, aeroporto</small></button>
+        <button type="button" class="mcard" data-k="Conquistar a casa"><b>Conquistar a casa</b><span>Fazer quem frequenta o prédio ou o clube experimentar o serviço.</span><small>Ex.: prédio comercial, clube</small></button>
+        <span class="ax ax-row r2" data-row="cheia">Agenda cheia</span>
+        <button type="button" class="mcard" data-k="Trazer de volta"><b>Trazer de volta</b><span>Fazer quem já lavou voltar, de preferência nos dias mais vazios.</span><small>Ex.: shopping que lota aos sábados</small></button>
+        <button type="button" class="mcard" data-k="Manter aquecido"><b>Manter aquecido</b><span>Manter os clientes da casa voltando, com ofertas de fidelidade.</span><small>Ex.: clube com sócios fiéis</small></button>
+      </div>
+      
+    </div>
+
+    <div class="pane" data-step="5">
+      <p class="eyebrow">Passo 5 de 6</p>
+      <h1>Quanto você quer investir por mês?</h1>
+      <div class="pk" id="pkBox"><div><div class="lbl">Seu pacote</div><div class="name" id="pkName2"></div></div><div class="why" id="pkFrase"></div></div>
+      <p class="lead" style="margin-top:16px">Os três cenários partem da sua meta de carros por dia. Escolha quanto dela você quer buscar agora.</p>
+      <div class="cens" id="cens" role="group" aria-label="Cenários de investimento"></div>
+      <p class="roi"><b>ROI</b> é o retorno sobre o investimento em mídia: quanto volta em lavagens para cada R$ 1 investido, antes da margem da loja.</p>
+      <div class="lanc hidden" id="lancBox"></div>
+    </div>
+
+    <div class="pane" data-step="6">
+      <p class="eyebrow">Passo 6 de 6</p>
+      <h1>Personalize e aprove</h1>
+      <p class="lead" id="resumoTopo"></p>
+      <p class="regra" id="regra"></p>
+      <div class="card" style="margin-top:14px">
+        <h2>Mídia digital</h2>
+        <div id="dig"></div>
+        <p class="err" id="digErr"></p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h2>Mídia off perto da sua loja</h2>
+        <p class="note" style="margin:-6px 0 4px" id="offNota"></p>
+        <div id="offs"></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h2>Sua lista de clientes <span class="opt">opcional</span></h2>
+        <p class="note" style="margin:-6px 0 10px;font-size:13px">Com a lista, as plataformas encontram seus clientes e pessoas parecidas com eles. Selecione um CSV ou TXT para contar os contatos localmente e escolha os usos pretendidos. O arquivo só será enviado ao aprovar o plano após entrar. O acesso fica restrito a você e à equipe administradora. A lista não é usada para mandar mensagens.</p>
+        <input type="file" id="lista" accept=".csv,.txt" aria-label="Arquivo da lista de clientes">
+        <p class="note" id="listaInfo"></p><label class="check"><input type="checkbox" id="listaConsent"> <span>Confirmo que posso compartilhar esta lista com a equipe DryWash/Layer Up para os usos selecionados.</span></label>
+        <label class="item" style="border:0;padding:6px 4px"><input type="checkbox" data-uso="remarketing" checked><span class="itxt"><b>Remarketing</b><span>Anunciar para quem já é cliente e chamar de volta.</span></span><span></span></label>
+        <label class="item" style="border:0;padding:6px 4px"><input type="checkbox" data-uso="semelhante" checked><span class="itxt"><b>Público semelhante</b><span>Encontrar pessoas com perfil parecido com o dos seus clientes.</span></span><span></span></label>
+        <label class="item" style="border:0;padding:6px 4px"><input type="checkbox" data-uso="excluir"><span class="itxt"><b>Não anunciar para quem já é cliente</b><span>Deixar as campanhas de novos clientes só para quem ainda não conhece a loja.</span></span><span></span></label>
+      </div>
+      <div class="totais" id="totais"></div>
+      <label class="check"><input type="checkbox" id="aceite"> <span>Estou de acordo com a estratégia e com a verba deste plano para o período indicado. A verba de mídia é investida pela loja.</span></label>
+      <button class="btn ghost big" id="btnPdf" type="button">Baixar simulação em PDF</button>
+      <button style="margin-top:10px" class="btn primary big" id="btnConfirm" type="button" disabled>Aprovar e baixar o PDF</button>
+      <div id="feedback" style="margin-top:12px"></div>
+      <p class="note">Premissas: ticket médio de R$ 135 (Lavagem Completa, R$ 100 a R$ 170); custo por contato por canal são referências da Layer Up; mídia off com preços de tabela do Canal do Mídia em 13/11/2026; 40% dos contatos viram cliente (hipótese a calibrar no piloto).</p>
+    </div>
+
+    <div class="navbtns">
+      <button class="btn ghost" id="btnBack" type="button">Voltar</button>
+      <button class="btn primary" id="btnNext" type="button">Continuar</button>
+    </div>
+    <p class="err hidden" id="stepErr"></p>
+  </div>
+</section>
+
+<!-- ========== PAINEL ========== -->
+<section id="viewPainel" class="hidden">
+  <div class="intro">
+    <div>
+      <h1>Painel interno de solicitações</h1>
+      <p>Planos aprovados pelos franqueados. Use para saber o orçamento e a estratégia que a agência roda em cada período. Visível apenas para administradores autorizados. Valores informados pelos usuários, sujeitos à revisão da equipe.</p>
+    </div>
+    <div class="cta">
+      <select id="fPeriodo" aria-label="Filtrar período" style="width:auto"></select>
+      <button class="btn ghost" id="btnCsv" type="button">Exportar CSV para a planilha</button>
+    </div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span>Planos aprovados</span><b class="num" id="tPlanos">0</b></div>
+    <div class="tile"><span>Lojas</span><b class="num" id="tLojas">0</b></div>
+    <div class="tile"><span>Verba ongoing/mês</span><b class="num" id="tVerba">R$ 0</b></div>
+    <div class="tile"><span>Verba pontual (lançamento + adicionais)</span><b class="num" id="tPont">R$ 0</b></div>
+  </div>
+  <div class="grid" style="grid-template-columns:2fr 1fr">
+    <div class="card scroll">
+      <h2>Solicitações</h2>
+      <table>
+        <thead><tr><th>Loja</th><th>Início</th><th>Pacote</th><th class="r">Verba/mês</th><th class="r">Pontual</th><th>Lista</th><th>Status</th></tr></thead>
+        <tbody id="tabPainel"><tr><td colspan="7" class="note">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="card"><h2>Por pacote</h2><div id="porPacote"></div></div>
+      <div class="card"><h2>Por praça</h2><div id="porPraca"></div></div>
+    </div>
+  </div>
+  <p class="note" id="painelNote"></p>
+</section>
+</main>
+<script src="inventory.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
